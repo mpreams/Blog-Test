@@ -1,5 +1,5 @@
 from datetime import date, datetime
-from flask import Flask, abort, render_template, redirect, url_for, flash
+from flask import Flask, abort, render_template, redirect, url_for, flash, request
 from flask_bootstrap import Bootstrap5
 from flask_ckeditor import CKEditor
 from flask_gravatar import Gravatar
@@ -48,7 +48,7 @@ class Base(DeclarativeBase):
     pass
 
 
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///posts.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get("DB_URI", "sqlite:///posts.db")
 db = SQLAlchemy(model_class=Base)
 db.init_app(app)
 
@@ -87,6 +87,15 @@ class Comment(db.Model):
     post_id: Mapped[int] = mapped_column(Integer, db.ForeignKey("blog_posts.id"))
     parent_post = relationship("BlogPost", back_populates="comments")
     posted_time = db.Column(db.DateTime, nullable=False)
+
+
+class Messages(db.Model):
+    __tablename__ = "messages"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(1000))
+    email: Mapped[str] = mapped_column(String(100))
+    phone: Mapped[str] = mapped_column(String(50))
+    message: Mapped[str] = mapped_column(Text, nullable=False)
 
 
 with app.app_context():
@@ -242,8 +251,17 @@ def about():
     return render_template("about.html")
 
 
-@app.route("/contact")
+@app.route("/contact", methods=["GET", "POST"])
 def contact():
+    if request.method == "POST":
+        message = Messages()
+        message.name = request.form.get("name", "")
+        message.email = request.form.get("email", "")
+        message.phone = request.form.get("phone", "")
+        message.message = request.form.get("message", "")
+        db.session.add(message)
+        db.session.commit()
+        return render_template("contact.html", msg_sent=True)
     return render_template("contact.html")
 
 
